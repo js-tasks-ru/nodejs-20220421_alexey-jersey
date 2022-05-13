@@ -1,8 +1,28 @@
 const url = require('url');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
+const LimitSizeStream = require('./LimitSizeStream');
 
 const server = new http.Server();
+
+const finish = (code, message, res) => {
+  res.statusCode = code;
+  res.end(message);
+};
+
+const storeFile = ({filepath, body, pathname, res}) => {
+  const writeStream = fs.createWriteStream(filepath);
+  writeStream.end(body);
+  writeStream.on('finish', () => {
+    res.statusCode = 201;
+    finish(201, `✅ File "${pathname}" added.`, res);
+  });
+  writeStream.on('error', () => {
+    res.statusCode = 500;
+    finish(500, 'Undefined error', res);
+  });
+};
 
 server.on('request', (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -10,14 +30,39 @@ server.on('request', (req, res) => {
 
   const filepath = path.join(__dirname, 'files', pathname);
 
-  switch (req.method) {
-    case 'POST':
+  if (pathname.indexOf('/') !== -1) {
+    finish(400, 'Bad request', res);
+  }
 
-      break;
+  if (fs.existsSync(filepath)) {
+    finish(409, 'File exist', res);
+  } else {
+    switch (req.method) {
+      case 'POST':
+        let data = null;
+        req.on('data', (chunk) => data = chunk);
+        req.on('end', () => {
+          const limitedStream = new LimitSizeStream({limit: 10000, encoding: 'utf-8'});
 
-    default:
-      res.statusCode = 501;
-      res.end('Not implemented');
+          limitedStream.end(data);
+
+          limitedStream.on('data', () => {
+            storeFile({filepath, data, pathname, res});
+          });
+
+          limitedStream.on('error', (error) => {
+            finish(413, error.message, res);
+          });
+        });
+        req.on('error', () => {
+          finish(500, 'Undefined error', res);
+        });
+
+        break;
+
+      default:
+        finish(501, 'Not implemented', res);
+    }
   }
 });
 

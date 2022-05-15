@@ -3,20 +3,24 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const LimitSizeStream = require('./LimitSizeStream');
-const responseEnd = require('../../helpers/responseEnd');
 
 const server = new http.Server();
+
+const handleResponseEnd = (code, message, res) => {
+  res.statusCode = code;
+  res.end(message);
+};
 
 const storeFile = ({filepath, body, pathname, res}) => {
   const writeStream = fs.createWriteStream(filepath);
   writeStream.end(body);
   writeStream.on('finish', () => {
     res.statusCode = 201;
-    responseEnd(201, `✅ File "${pathname}" added.`, res);
+    handleResponseEnd(201, `✅ File "${pathname}" added.`, res);
   });
   writeStream.on('error', () => {
     res.statusCode = 500;
-    responseEnd(500, 'Undefined error', res);
+    handleResponseEnd(500, 'Undefined error', res);
   });
 };
 
@@ -27,9 +31,9 @@ server.on('request', (req, res) => {
   const filepath = path.join(__dirname, 'files', pathname);
 
   if (pathname.indexOf('/') !== -1) {
-    responseEnd(400, 'Bad request', res);
+    handleResponseEnd(400, 'Bad request', res);
   } else if (fs.existsSync(filepath)) {
-    responseEnd(409, 'File exist', res);
+    handleResponseEnd(409, 'File exist', res);
   } else {
     switch (req.method) {
       case 'POST':
@@ -45,17 +49,17 @@ server.on('request', (req, res) => {
           });
 
           limitedStream.on('error', (error) => {
-            responseEnd(413, error.message, res);
+            handleResponseEnd(413, error.message, res);
           });
         });
         req.on('error', () => {
-          responseEnd(500, 'Undefined error', res);
+          handleResponseEnd(500, 'Undefined error', res);
         });
 
         break;
 
       default:
-        responseEnd(501, 'Not implemented', res);
+        handleResponseEnd(501, 'Not implemented', res);
     }
   }
 });

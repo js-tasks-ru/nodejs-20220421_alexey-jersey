@@ -13,7 +13,7 @@ const handleResponseEnd = (code, message, res) => {
 
 const storeFile = ({filepath, body, pathname, res}) => {
   const writeStream = fs.createWriteStream(filepath);
-  writeStream.end(body);
+  writeStream.end(body.join());
   writeStream.on('finish', () => {
     res.statusCode = 201;
     handleResponseEnd(201, `✅ File "${pathname}" added.`, res);
@@ -37,15 +37,17 @@ server.on('request', (req, res) => {
   } else {
     switch (req.method) {
       case 'POST':
-        let data = null;
-        req.on('data', (chunk) => data = chunk);
+        const body = [];
+        req.on('data', (chunk) => {
+          body.push(chunk);
+        });
         req.on('end', () => {
           const limitedStream = new LimitSizeStream({limit: 10000, encoding: 'utf-8'});
 
-          limitedStream.end(data);
+          limitedStream.end(body.join());
 
           limitedStream.on('data', () => {
-            storeFile({filepath, data, pathname, res});
+            storeFile({filepath, body, pathname, res});
           });
 
           limitedStream.on('error', (error) => {

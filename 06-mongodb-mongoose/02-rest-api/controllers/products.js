@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
 
-const productsDataNormalized = require('../helpers/productsDataNormalized');
+const productsDataNormalized = require('../../../helpers/productsDataNormalized');
 
 module.exports.productsBySubcategory = async function productsBySubcategory(ctx, next) {
   const {subcategory} = ctx.query;
